@@ -1,0 +1,16 @@
+{
+  "name": "ai-executive-assistant",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI Executive Assistant with Google Calendar auto-resolution (MVP)",
+  "scripts": {
+    "install:all": "npm --prefix backend install && npm --prefix frontend install",
+    "build": "npm --prefix frontend run build",
+    "start": "npm run build && npm --prefix backend start",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "typecheck": "npm --prefix backend run typecheck && npm --prefix frontend run typecheck",
+    "test": "npm --prefix backend test && npm --prefix frontend test",
+    "test:e2e": "python3 e2e/run_e2e.py"
+  }
+}
