@@ -1,0 +1,128 @@
+// Production data model (PostgreSQL). The MVP runtime uses the in-memory
+// repository in backend/src/store.ts; swap it for Prisma-backed repositories
+// using this schema:  npx prisma migrate dev --schema database/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String   @id @default(cuid())
+  fullName        String
+  email           String   @unique
+  passwordHash    String
+  timezone        String   @default("UTC") // IANA identifier
+  workingStart    String   @default("09:00")
+  workingEnd      String   @default("18:00")
+  workingDays     Int[]    @default([1, 2, 3, 4, 5])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  connection      CalendarConnection?
+  participants    Participant[]
+  requests        SchedulingRequest[]
+  meetings        Meeting[]
+  drafts          InvitationDraft[]
+  auditLogs       AuditLog[]
+}
+
+model CalendarConnection {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider              String   @default("google")
+  providerAccountId     String?
+  encryptedAccessToken  String?  // AES-256-GCM; never returned to the frontend
+  encryptedRefreshToken String?
+  tokenExpiry           DateTime?
+  grantedScopes         String[]
+  status                String   @default("connected")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model Participant {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name      String
+  email     String
+  timezone  String?
+  required  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([ownerId, email])
+}
+
+model SchedulingRequest {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  originalPrompt   String
+  parsedConstraints Json
+  status           String   // needs_clarification | ready | no_availability | failed | booked
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  slots            ProposedSlot[]
+  drafts           InvitationDraft[]
+}
+
+model ProposedSlot {
+  id                   String   @id
+  requestId            String
+  request              SchedulingRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  startUtc             DateTime
+  endUtc               DateTime
+  score                Float
+  availability         Json
+  recommendationReason String
+  selected             Boolean  @default(false)
+}
+
+model Meeting {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  googleEventId String   @unique
+  title         String
+  description   String
+  startUtc      DateTime
+  endUtc        DateTime
+  timezone      String
+  location      String?
+  status        String   @default("confirmed")
+  createdAt     DateTime @default(now())
+}
+
+model InvitationDraft {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestId    String
+  request      SchedulingRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  slotId       String
+  payload      Json
+  status       String   // awaiting_confirmation | creating | created | failed | cancelled
+  eventId      String?
+  approvedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action       String
+  resourceType String
+  resourceId   String
+  status       String
+  metadata     Json?
+  timestamp    DateTime @default(now())
+}
